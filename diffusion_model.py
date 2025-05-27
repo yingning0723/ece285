@@ -22,7 +22,7 @@ class DiffusionModel(nn.Module):
         self.create_dirs(self.file_dir)
 
     def train(self, batch_size=64, n_epoch=32, lr=1e-3, timesteps=500, beta1=1e-4, beta2=0.02,
-              checkpoint_save_dir=None, image_save_dir=None):
+              checkpoint_save_dir=None, image_save_dir=None, conditional=True):
         """Trains model for given inputs"""
         self.nn_model.train()        
         _ , _, ab_t = self.get_ddpm_noise_schedule(timesteps, beta1, beta2, self.device)
@@ -38,7 +38,11 @@ class DiffusionModel(nn.Module):
 
             for x, c in tqdm(dataloader, mininterval=2, desc=f"Epoch {epoch}"):
                 x = x.to(self.device)
-                c = self.get_masked_context(c).to(self.device)
+                if conditional:
+                  c = self.get_masked_context(c).to(self.device)
+                else:
+                  c = None
+
                 
                 # perturb data
                 noise = torch.randn_like(x)
@@ -67,7 +71,7 @@ class DiffusionModel(nn.Module):
 
     @torch.no_grad()
     def sample_ddpm(self, n_samples, context=None, timesteps=None, 
-                    beta1=None, beta2=None, save_rate=20, inference_transform=lambda x: (x+1)/2):
+                    beta1=None, beta2=None, save_rate=20, inference_transform=lambda x: (x+1)/2,conditional=True):
         """Returns the final denoised sample x0,
         intermediate samples xT, xT-1, ..., x1, and
         times tT, tT-1, ..., t1
@@ -310,23 +314,29 @@ class DiffusionModel(nn.Module):
         context.extend([n_classes - 1]*(n_samples - len(context)))
         return torch.nn.functional.one_hot(torch.tensor(context), n_classes).float().to(device)
     
-    def generate(self, n_samples, n_images_per_row, timesteps, beta1, beta2):
+    def generate(self, n_samples, n_images_per_row, timesteps, beta1, beta2,conditional=True):
         """Generates x0 and intermediate samples xi via DDPM, 
         and saves as jpeg and gif files for given inputs
         """
         root = os.path.join(self.file_dir, "generated-images")
         os.makedirs(root, exist_ok=True)
-        x0, intermediate_samples, t_steps = self.sample_ddpm(n_samples,
-                                                             self.get_custom_context(
-                                                                 n_samples, self.nn_model.n_cfeat, 
-                                                                 self.device),
-                                                             timesteps,
-                                                             beta1,
-                                                             beta2,)
-        save_image(x0, os.path.join(root, f"{self.dataset_name}_ddpm_images.jpeg"), nrow=n_images_per_row)
+        if conditional:
+            context = self.get_custom_context(n_samples, self.nn_model.n_cfeat, self.device)
+        else:
+            context = None 
+        
+        x0, intermediate_samples, t_steps = self.sample_ddpm(
+        n_samples,
+        context,
+        timesteps,
+        beta1,
+        beta2,
+        conditional=True  # ❗️关闭条件生成
+           )
+        save_image(x0, os.path.join(root, f"{self.dataset_name}_ddpm_images2.jpeg"), nrow=n_images_per_row)
         generate_animation(intermediate_samples,
                            t_steps, 
-                           os.path.join(root, f"{self.dataset_name}_ani.gif"),
+                           os.path.join(root, f"{self.dataset_name}_ani2.gif"),
                            n_images_per_row)
 
 

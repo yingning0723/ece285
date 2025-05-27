@@ -13,10 +13,12 @@ def parse_arguments():
     parser.add_argument("--timesteps", type=int, default=None, help="Total timesteps for sampling")
     parser.add_argument("--beta1", type=float, default=None, help="Hyperparameter for DDPM")
     parser.add_argument("--beta2", type=float, default=None, help="Hyperparameter for DDPM")
+    parser.add_argument('--conditional', action='store_true', help='Use class-conditional model')
+
     return parser.parse_args()
 
 
 if __name__=="__main__":    
     args = parse_arguments()
     diffusion_model = DiffusionModel(device=args.device, checkpoint_name=args.checkpoint_name)
-    diffusion_model.generate(args.n_samples, args.n_images_per_row, args.timesteps, args.beta1, args.beta2)
+    diffusion_model.generate(args.n_samples, args.n_images_per_row, args.timesteps, args.beta1, args.beta2,conditional=args.conditional)
