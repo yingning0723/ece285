@@ -21,11 +21,18 @@ class DiffusionModel(nn.Module):
         self.nn_model = self.initialize_nn_model(self.dataset_name, checkpoint_name, self.file_dir, self.device)
         self.create_dirs(self.file_dir)
 
+    # def train(self, batch_size=64, n_epoch=32, lr=1e-3, timesteps=500, beta1=1e-4, beta2=0.02,
+    #           checkpoint_save_dir=None, image_save_dir=None, conditional=True):
+    ############————————————————cosine noise——————————————————————############
     def train(self, batch_size=64, n_epoch=32, lr=1e-3, timesteps=500, beta1=1e-4, beta2=0.02,
-              checkpoint_save_dir=None, image_save_dir=None, conditional=True):
+              checkpoint_save_dir=None, image_save_dir=None, conditional=True, schedule='linear'):
+    ############————————————————cosine noise——————————————————————############
         """Trains model for given inputs"""
         self.nn_model.train()        
-        _ , _, ab_t = self.get_ddpm_noise_schedule(timesteps, beta1, beta2, self.device)
+        # _ , _, ab_t = self.get_ddpm_noise_schedule(timesteps, beta1, beta2, self.device)
+        ############————————————————cosine noise——————————————————————############
+        a_t, b_t, ab_t = self.get_noise_schedule(timesteps, beta1, beta2, schedule, self.device)
+        ############————————————————cosine noise——————————————————————############
         dataset = self.instantiate_dataset(self.dataset_name, 
                             self.get_transforms(self.dataset_name), self.file_dir)
         dataloader = self.initialize_dataloader(dataset, batch_size, self.checkpoint_name, self.file_dir)
@@ -70,14 +77,44 @@ class DiffusionModel(nn.Module):
                                  dataloader.batch_size, self.file_dir, checkpoint_save_dir)
 
     @torch.no_grad()
+    ############————————————————cosine noise——————————————————————############
+    def get_noise_schedule(self, timesteps, beta1, beta2, schedule, device):
+        """Generates noise schedule betas, alphas, alpha-hats"""
+        if schedule == 'linear':
+            b_t = torch.linspace(beta1, beta2, timesteps+1, device=device)
+        elif schedule == 'cosine':
+            import numpy as np
+            s = 0.008
+            steps = timesteps + 1
+            x = np.linspace(0, timesteps, steps)
+            alphas_cumprod = np.cos(((x / timesteps) + s) / (1 + s) * np.pi * 0.5) ** 2
+            alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
+            b_t = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
+            b_t = np.clip(b_t, a_min=0, a_max=0.999)
+            b_t = torch.from_numpy(b_t).float().to(device)
+        else:
+            raise ValueError(f"Unknown schedule type: {schedule}")
+        
+        a_t = 1 - b_t
+        ab_t = torch.cumprod(a_t, dim=0)
+        return a_t, b_t, ab_t
+    ############————————————————cosine noise——————————————————————############
+    # def sample_ddpm(self, n_samples, context=None, timesteps=None, 
+    #                 beta1=None, beta2=None, save_rate=20, inference_transform=lambda x: (x+1)/2,conditional=True):
+    ############————————————————cosine noise——————————————————————############
     def sample_ddpm(self, n_samples, context=None, timesteps=None, 
-                    beta1=None, beta2=None, save_rate=20, inference_transform=lambda x: (x+1)/2,conditional=True):
+                beta1=None, beta2=None, schedule='linear', save_rate=20, inference_transform=lambda x: (x+1)/2, conditional=True):
+    ############————————————————cosine noise——————————————————————############
         """Returns the final denoised sample x0,
         intermediate samples xT, xT-1, ..., x1, and
         times tT, tT-1, ..., t1
         """
+        # if all([timesteps, beta1, beta2]):
+        #     a_t, b_t, ab_t = self.get_ddpm_noise_schedule(timesteps, beta1, beta2, self.device)
+        ############————————————————cosine noise——————————————————————############
         if all([timesteps, beta1, beta2]):
-            a_t, b_t, ab_t = self.get_ddpm_noise_schedule(timesteps, beta1, beta2, self.device)
+            a_t, b_t, ab_t = self.get_noise_schedule(timesteps, beta1, beta2, schedule, self.device)
+        ############————————————————cosine noise——————————————————————############
         else:
             timesteps, a_t, b_t, ab_t = self.get_ddpm_params_from_checkpoint(self.file_dir,
                                                                              self.checkpoint_name, 
@@ -331,7 +368,7 @@ class DiffusionModel(nn.Module):
         timesteps,
         beta1,
         beta2,
-        conditional=True  # ❗️关闭条件生成
+        conditional=True 
            )
         save_image(x0, os.path.join(root, f"{self.dataset_name}_ddpm_images2.jpeg"), nrow=n_images_per_row)
         generate_animation(intermediate_samples,

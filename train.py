@@ -2,7 +2,6 @@ import argparse
 from diffusion_model import DiffusionModel
 
 
-
 def parse_arguments():
     """Returns parsed arguments"""
     parser = argparse.ArgumentParser(description="Train diffusion model")
@@ -18,6 +17,9 @@ def parse_arguments():
     parser.add_argument("--checkpoint-save-dir", type=str, default=None, help="Directory to save checkpoints")
     parser.add_argument("--image-save-dir", type=str, default=None, help="Directory to save generated images during training")
     parser.add_argument('--conditional', action='store_true', help='Use class-conditional model')
+    ############————————————————cosine noise——————————————————————############
+    parser.add_argument('--schedule', type=str, default='linear', choices=['linear', 'cosine'], help='Noise schedule type')
+    ############————————————————cosine noise——————————————————————############
 
     return parser.parse_args()
 
@@ -26,8 +28,13 @@ if __name__=="__main__":
     args = parse_arguments()
     diffusion_model = DiffusionModel(device=args.device, dataset_name=args.dataset_name, 
                                      checkpoint_name=args.checkpoint_name)
+    # diffusion_model.train(batch_size=args.batch_size, n_epoch=args.epochs, lr=args.lr,
+    #                       timesteps=args.timesteps, beta1=args.beta1, beta2=args.beta2,
+    #                       checkpoint_save_dir=args.checkpoint_save_dir, image_save_dir=args.image_save_dir, conditional=args.conditional)
+###########————————————————cosine noise——————————————————————############
     diffusion_model.train(batch_size=args.batch_size, n_epoch=args.epochs, lr=args.lr,
                           timesteps=args.timesteps, beta1=args.beta1, beta2=args.beta2,
-                          checkpoint_save_dir=args.checkpoint_save_dir, image_save_dir=args.image_save_dir, conditional=args.conditional)
-
+                          checkpoint_save_dir=args.checkpoint_save_dir, image_save_dir=args.image_save_dir,
+                          conditional=args.conditional, schedule=args.schedule)
+###########————————————————cosine noise——————————————————————############
 
