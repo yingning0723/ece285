@@ -1,8 +1,6 @@
 import torch
 from torch import nn
 
-
-
 class ResidualConvBlock(nn.Module):
     """Convolutional Residual Block"""
     def __init__(self, in_channels, out_channels, is_res=False):
@@ -34,7 +32,6 @@ class ResidualConvBlock(nn.Module):
             else:
                 x_out = x_out + x
             return x_out / 1.414 # normalize
-
 
 class UNetDown(nn.Module):
     """UNet downward block (i.e., contracting block)"""
@@ -78,21 +75,26 @@ class EmbedFC(nn.Module):
 
     def forward(self, x):
         x = x.reshape(-1, self.input_dim)
-        return self.model(x)[:, :, None, None]
+##########————————fine-graind————————##########
+        #return self.model(x)[:, :, None, None]
+        return self.model(x)
+##########————————fine-graind————————##########
 
-class FiLMBlock(nn.Module):
-    def __init__(self, cond_dim, feat_dim):
+##########————————fine-graind————————##########
+class FiLM(nn.Module):
+    def __init__(self, in_channels, emb_dim):
         super().__init__()
-        
-        self.gamma = nn.Linear(cond_dim, feat_dim)
-        self.beta = nn.Linear(cond_dim, feat_dim)
+        self.gamma = nn.Linear(emb_dim, in_channels)
+        self.beta = nn.Linear(emb_dim, in_channels)
 
-    def forward(self, x, cond1, cond2):
-        
-        # cond1, cond2: (B, C, 1, 1)
-        cond = cond1 + cond2
-        gamma, beta = cond.chunk(2, dim=1)  # cond is (B, 2C, 1, 1) —> gamma: (B, C, 1, 1), beta: (B, C, 1, 1)
-        return (1 + gamma) * x + beta
+    def forward(self, x, emb):
+        gamma = self.gamma(emb).unsqueeze(-1).unsqueeze(-1)
+        beta = self.beta(emb).unsqueeze(-1).unsqueeze(-1)
+        return gamma * x + beta
+
+
+
+##########————————fine-graind————————##########
 
 class ContextUnet(nn.Module):
     """Context UNet model
@@ -113,7 +115,17 @@ class ContextUnet(nn.Module):
         self.n_feat = n_feat
         self.n_cfeat = n_cfeat
         self.n_downs = n_downs
-        self.film_blocks = nn.ModuleList([FiLMBlock(n_cfeat, 2**i*n_feat) for i in range(n_downs, 0, -1)])
+
+        ##########————————fine-graind————————##########
+        self.unify_embs = nn.ModuleList([
+            nn.Linear(2**i * n_feat, 2**i * n_feat)
+            for i in range(n_downs, 0, -1)
+        ])
+        self.film_blocks = nn.ModuleList([
+            FiLM(in_channels=2**i * n_feat, emb_dim=2**i * n_feat)
+            for i in range(n_downs, 0, -1)
+        ])
+        ##########————————fine-graind————————##########
 
         # Define initial convolution
         self.init_conv = ResidualConvBlock(in_channels, n_feat, True)
@@ -160,16 +172,26 @@ class ContextUnet(nn.Module):
             if i == 0: downs.append(down_block(x))
             else: downs.append(down_block(downs[-1]))
         up = self.up0(self.to_vec(downs[-1]))
-        for up_block, down, contextemb, timeemb, film in zip(
-          self.up_blocks, downs[::-1], self.contextembs, self.timeembs, self.film_blocks):
-          if c is not None:
-              context_feat = contextemb(c)   # (B, 2C, 1, 1)
-              t_feat = timeemb(t)            # (B, 2C, 1, 1)
-              up = up_block(film(up, context_feat, t_feat), down)
+        ##########————————fine-graind————————##########
+        for i, (up_block, down, contextemb, timeemb, unify_emb, film_block) in enumerate(
+            zip(self.up_blocks, reversed(downs), self.contextembs, self.timeembs,
+                self.unify_embs, self.film_blocks)):
+            
+            t_feat = timeemb(t)
+            if c is not None:
+                context_feat = contextemb(c)
+                combined_emb = context_feat + t_feat  # shape [batch, 2**i * n_feat]
+                combined_emb = combined_emb.view(combined_emb.shape[0], -1)
+                combined_emb = unify_emb(combined_emb)  # → [batch, 2**(i+1) * n_feat]
 
-          else:
-              t_feat = timeemb(t)
-              up = up_block(up + t_feat, down)
-
-
+                assert combined_emb.shape[1] == up.shape[1], f"Mismatch at layer {i}: combined_emb {combined_emb.shape}, up {up.shape}"
+                
+                up = up_block(film_block(up, combined_emb), down)
+            else:
+                up = up_block(up + t_feat, down)
+        ##########————————fine-graind————————##########
+        ### below is correct
+        # for up_block, down, contextemb, timeemb in zip(self.up_blocks, downs[::-1], self.contextembs, self.timeembs):
+        #   context_factor = contextemb(c) if c is not None else 1
+        #   up = up_block(up * context_factor + timeemb(t), down)
         return self.final_conv(torch.cat([up, x], axis=1))
