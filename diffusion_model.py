@@ -355,7 +355,7 @@ class DiffusionModel(nn.Module):
         """Generates x0 and intermediate samples xi via DDPM, 
         and saves as jpeg and gif files for given inputs
         """
-        root = os.path.join(self.file_dir, "generated-images")
+        root = os.path.join(self.file_dir, "figures_for_summary")
         os.makedirs(root, exist_ok=True)
         if conditional:
             context = self.get_custom_context(n_samples, self.nn_model.n_cfeat, self.device)
@@ -370,10 +370,10 @@ class DiffusionModel(nn.Module):
         beta2,
         conditional=True 
            )
-        save_image(x0, os.path.join(root, f"{self.dataset_name}_ddpm_images2.jpeg"), nrow=n_images_per_row)
+        save_image(x0, os.path.join(root, f"{self.dataset_name}_conditional_linear.jpeg"), nrow=n_images_per_row)
         generate_animation(intermediate_samples,
                            t_steps, 
-                           os.path.join(root, f"{self.dataset_name}_ani2.gif"),
+                           os.path.join(root, f"{self.dataset_name}conditional_linear.gif"),
                            n_images_per_row)
 
 
