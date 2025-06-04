@@ -31,5 +31,11 @@ We implement a **Conditional UNet-based DDPM** with:
 To train the model from scratch:
 
 ```bash
-python train.py --dataset-name fashion-mnist --batch-size 64 --epochs 40 --lr 1e-4
+## default is unconditional
+!python train.py --dataset fashion_mnist --epochs 10
+!python train.py --dataset fashion_mnist --epochs 10 --conditional --schedule cosine
+
+## sample
+!python sample.py pretrained_fashion_mnist_findGrained.pth --n-samples 300 --n-images-per-row 10 --conditional
+
 
