@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 class ResidualConvBlock(nn.Module):
     """Convolutional Residual Block"""
@@ -188,6 +189,9 @@ class ContextUnet(nn.Module):
                 
                 up = up_block(film_block(up, combined_emb), down)
             else:
+                t_feat = t_feat.view(t_feat.shape[0], t_feat.shape[1], 1, 1)
+                if t_feat.shape[2:] != up.shape[2:]:
+                    t_feat = F.interpolate(t_feat, size=up.shape[2:], mode='nearest')
                 up = up_block(up + t_feat, down)
         ##########————————fine-graind————————##########
         ### below is correct

@@ -355,7 +355,7 @@ class DiffusionModel(nn.Module):
         """Generates x0 and intermediate samples xi via DDPM, 
         and saves as jpeg and gif files for given inputs
         """
-        root = os.path.join(self.file_dir, "figures_for_summary")
+        root = os.path.join(self.file_dir, "generated-images")
         os.makedirs(root, exist_ok=True)
         if conditional:
             context = self.get_custom_context(n_samples, self.nn_model.n_cfeat, self.device)
