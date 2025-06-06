@@ -4,7 +4,7 @@ This is the official repository for our ECE 285 project implementing a **Conditi
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 - `train.py` – Train the conditional DDPM model.
 - `sample.py` – Generate samples from the trained model and visualize them.
@@ -15,7 +15,7 @@ This is the official repository for our ECE 285 project implementing a **Conditi
 
 ---
 
-## 🧠 Model Overview
+## Model Overview
 
 We implement a **Conditional UNet-based DDPM** with:
 - 3-level downsampling and upsampling architecture.
@@ -26,7 +26,7 @@ We implement a **Conditional UNet-based DDPM** with:
 
 ---
 
-## 🛠️ Training
+## Training
 
 To train the model from scratch:
 
